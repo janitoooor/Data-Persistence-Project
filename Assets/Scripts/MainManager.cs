@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using System.IO;
 
 public class MainManager : MonoBehaviour
 {
@@ -11,15 +12,34 @@ public class MainManager : MonoBehaviour
     public Rigidbody Ball;
 
     public Text ScoreText;
+
+    public Text BestPlayerNameAndScore;
+
     public GameObject GameOverText;
-    
+
+    public AudioSource music;
+    public AudioSource effect;
+
     private bool m_Started = false;
     private int m_Points;
     
     private bool m_GameOver = false;
 
-    
-    // Start is called before the first frame update
+    private static int bestScore;
+    private static string bestPlayer;
+    private static int secondBestScore;
+    private static string secondPlayer;
+    private static string currentName;
+
+    public float voice;
+    public float effectVoice;
+
+    private void Awake()
+    {
+        LoadGameRank();
+        SetVolumeMusic();
+    }
+
     void Start()
     {
         const float step = 0.6f;
@@ -36,6 +56,9 @@ public class MainManager : MonoBehaviour
                 brick.onDestroyed.AddListener(AddPoint);
             }
         }
+
+        SetVolumeMusic();
+        SetBestPlayer();
     }
 
     private void Update()
@@ -65,6 +88,7 @@ public class MainManager : MonoBehaviour
     void AddPoint(int point)
     {
         m_Points += point;
+        UIManager.Instance.score = m_Points;
         ScoreText.text = $"Score : {m_Points}";
     }
 
@@ -72,5 +96,104 @@ public class MainManager : MonoBehaviour
     {
         m_GameOver = true;
         GameOverText.SetActive(true);
+        CheckBestPlayer();
+    }
+
+    private void CheckBestPlayer()
+    {
+        int CurrentScore = UIManager.Instance.score;
+        currentName = UIManager.Instance.namePlayer;
+
+        if (CurrentScore > bestScore)
+        {
+            secondPlayer = bestPlayer;
+            bestPlayer = UIManager.Instance.namePlayer;
+            secondBestScore = bestScore;
+            bestScore = CurrentScore;
+
+            BestPlayerNameAndScore.text = $"Best Score - {secondPlayer}: {secondBestScore}" + $" Second Best Score - {bestPlayer} : {bestScore}"; 
+            SaveGameRank(bestPlayer, bestScore, currentName, secondPlayer, secondBestScore);
+        }
+        else if(CurrentScore < bestScore && CurrentScore > secondBestScore)
+        {
+            secondPlayer = UIManager.Instance.namePlayer;
+            secondBestScore = CurrentScore;
+
+            BestPlayerNameAndScore.text = $"Best Score - {bestPlayer}: {bestScore} " + $" Second Best Score - {secondPlayer} : {secondBestScore}";
+            SaveGameRank(bestPlayer, bestScore, currentName, secondPlayer, secondBestScore);
+        }
+        else
+        {
+            SaveGameRank(bestPlayer, bestScore, currentName, secondPlayer, secondBestScore);
+        }
+    }
+    private void SetBestPlayer()
+    {
+        if (bestPlayer == null && bestScore == 0)
+        {
+            BestPlayerNameAndScore.text = "";
+        }
+        else
+        {
+            BestPlayerNameAndScore.text = $"Best Score - {bestPlayer}: {bestScore} " + $" Second Best Score - {secondPlayer} : {secondBestScore}";
+        }
+
+    }
+
+    private void SetVolumeMusic()
+    {
+        music.volume = voice;
+        effect.volume = effectVoice;
+    }
+
+    public void SaveGameRank(string bestPlayerName, int bestPlayerScore, string currentLastName, string secondBestPlayerName, int secondBestPlayerScore)
+    {
+        SaveData data = new SaveData();
+
+        data.TheBestPlayer = bestPlayerName;
+        data.HighiestScore = bestPlayerScore;
+        data.CurrentName = currentLastName;
+        data.SecondBest = secondBestPlayerName;
+        data.SecondScore = secondBestPlayerScore;
+        data.MusicVoice = voice;
+        data.EffectVoice = effectVoice;
+
+        string json = JsonUtility.ToJson(data);
+        File.WriteAllText(Application.persistentDataPath + "/savefile.json", json);
+    }
+
+    public void LoadGameRank()
+    {
+        string path = Application.persistentDataPath + "/savefile.json";
+
+        if (File.Exists(path))
+        {
+            string json = File.ReadAllText(path);
+            SaveData data = JsonUtility.FromJson<SaveData>(json);
+
+            bestPlayer = data.TheBestPlayer;
+            bestScore = data.HighiestScore;
+            voice = data.MusicVoice;
+            secondPlayer = data.SecondBest;
+            secondBestScore = data.SecondScore;
+            effectVoice = data.EffectVoice;
+        }
+    }
+    public void ExitToMenu()
+    {
+        SceneManager.LoadScene(1);
+    }
+
+
+    [System.Serializable]
+    class SaveData
+    {
+        public int HighiestScore;
+        public int SecondScore;
+        public string TheBestPlayer;
+        public string CurrentName;
+        public string SecondBest;
+        public float MusicVoice;
+        public float EffectVoice;
     }
 }
